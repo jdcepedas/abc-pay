@@ -1,0 +1,23 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: api-gateway
+abcpay:
+  validator-url: ${ABCPAY_VALIDATOR_URL:http://signature-validator:8081}
+  payments-url: ${ABCPAY_PAYMENTS_URL:http://payments-service:8082}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha

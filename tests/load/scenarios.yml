@@ -1,0 +1,60 @@
+config:
+  target: "{{ $processEnvironment.ABCPAY_GATEWAY_URL || 'http://localhost:8080' }}"
+  http:
+    timeout: 10
+  phases:
+    - name: warmup
+      duration: 30
+      arrivalRate: 5
+      rampTo: 25
+    - name: steady
+      duration: 240
+      arrivalRate: 30
+    - name: surge
+      duration: 60
+      arrivalRate: 30
+      rampTo: 80
+    - name: cooldown
+      duration: 30
+      arrivalRate: 80
+      rampTo: 5
+  processor: "./processor.js"
+  defaults:
+    headers:
+      Content-Type: "application/json"
+
+scenarios:
+  - name: A5_valid
+    weight: 80
+    flow:
+      - post:
+          url: "/api/payments"
+          beforeRequest: "signValid"
+
+  - name: A1_bit_flip
+    weight: 5
+    flow:
+      - post:
+          url: "/api/payments"
+          beforeRequest: "signThenBitFlip"
+
+  - name: A2_header_tamper
+    weight: 5
+    flow:
+      - post:
+          url: "/api/payments"
+          beforeRequest: "signThenChangeTimestamp"
+
+  - name: A3_signature_swap
+    weight: 5
+    flow:
+      - post:
+          url: "/api/payments"
+          beforeRequest: "signOtherBody"
+
+  - name: A4_stale_replay
+    weight: 5
+    flow:
+      - post:
+          url: "/api/payments"
+          beforeRequest: "signWithStaleTimestamp"

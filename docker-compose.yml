@@ -1,0 +1,149 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: abcpay-postgres
+    environment:
+      POSTGRES_DB: abcpay
+      POSTGRES_USER: abcpay
+      POSTGRES_PASSWORD: abcpay
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./infra/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U abcpay -d abcpay"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  signature-validator:
+    build:
+      context: .
+      dockerfile: services/signature-validator/Dockerfile
+    container_name: abcpay-signature-validator
+    environment:
+      ABCPAY_SHARED_SECRET: ${ABCPAY_SHARED_SECRET:-dev-shared-secret-change-me}
+      ABCPAY_MAX_SKEW_SECONDS: "300"
+    ports:
+      - "8081:8081"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8081/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  ledger-service:
+    build:
+      context: .
+      dockerfile: services/ledger-service/Dockerfile
+    container_name: abcpay-ledger-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/abcpay
+      SPRING_DATASOURCE_USERNAME: abcpay
+      SPRING_DATASOURCE_PASSWORD: abcpay
+      ABCPAY_SHARED_SECRET: ${ABCPAY_SHARED_SECRET:-dev-shared-secret-change-me}
+    ports:
+      - "8083:8083"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8083/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  payments-service:
+    build:
+      context: .
+      dockerfile: services/payments-service/Dockerfile
+    container_name: abcpay-payments-service
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ledger-service:
+        condition: service_healthy
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/abcpay
+      SPRING_DATASOURCE_USERNAME: abcpay
+      SPRING_DATASOURCE_PASSWORD: abcpay
+      ABCPAY_LEDGER_URL: http://ledger-service:8083
+    ports:
+      - "8082:8082"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8082/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: services/api-gateway/Dockerfile
+    container_name: abcpay-api-gateway
+    depends_on:
+      signature-validator:
+        condition: service_healthy
+      payments-service:
+        condition: service_healthy
+    environment:
+      ABCPAY_VALIDATOR_URL: http://signature-validator:8081
+      ABCPAY_PAYMENTS_URL: http://payments-service:8082
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q UP"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
+  prometheus:
+    image: prom/prometheus:v2.55.0
+    container_name: abcpay-prometheus
+    depends_on:
+      api-gateway:
+        condition: service_healthy
+      signature-validator:
+        condition: service_healthy
+      payments-service:
+        condition: service_healthy
+      ledger-service:
+        condition: service_healthy
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=2h'
+      - '--web.enable-lifecycle'
+
+  grafana:
+    image: grafana/grafana:11.2.0
+    container_name: abcpay-grafana
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_USERS_DEFAULT_THEME: dark
+      GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH: /var/lib/grafana/dashboards/asr-seg-02.json
+    volumes:
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+
+volumes:
+  postgres-data:
+    name: abcpay-postgres-data
+  prometheus-data:
+    name: abcpay-prometheus-data
+  grafana-data:
+    name: abcpay-grafana-data

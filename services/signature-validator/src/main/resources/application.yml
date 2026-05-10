@@ -1,0 +1,23 @@
+server:
+  port: 8081
+spring:
+  application:
+    name: signature-validator
+abcpay:
+  shared-secret: ${ABCPAY_SHARED_SECRET:dev-shared-secret-change-me}
+  max-skew-seconds: ${ABCPAY_MAX_SKEW_SECONDS:300}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha

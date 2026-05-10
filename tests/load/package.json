@@ -1,0 +1,13 @@
+{
+  "name": "abc-pay-load",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Artillery load generator for the ASR-SEG-02 live demo",
+  "scripts": {
+    "load": "artillery run scenarios.yml",
+    "quick": "artillery run --overrides='{\"config\":{\"phases\":[{\"duration\":30,\"arrivalRate\":20}]}}' scenarios.yml"
+  },
+  "devDependencies": {
+    "artillery": "^2.0.21"
+  }
+}

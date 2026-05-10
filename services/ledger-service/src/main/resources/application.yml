@@ -1,0 +1,33 @@
+server:
+  port: 8083
+spring:
+  application:
+    name: ledger-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/abcpay}
+    username: ${SPRING_DATASOURCE_USERNAME:abcpay}
+    password: ${SPRING_DATASOURCE_PASSWORD:abcpay}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: ledger
+        jdbc.time_zone: UTC
+abcpay:
+  shared-secret: ${ABCPAY_SHARED_SECRET:dev-shared-secret-change-me}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha

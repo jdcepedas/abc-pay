@@ -1,0 +1,32 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: api-gateway
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['api-gateway:8080']
+        labels:
+          service: api-gateway
+
+  - job_name: signature-validator
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['signature-validator:8081']
+        labels:
+          service: signature-validator
+
+  - job_name: payments-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['payments-service:8082']
+        labels:
+          service: payments-service
+
+  - job_name: ledger-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['ledger-service:8083']
+        labels:
+          service: ledger-service

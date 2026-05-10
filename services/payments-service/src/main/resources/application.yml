@@ -1,0 +1,33 @@
+server:
+  port: 8082
+spring:
+  application:
+    name: payments-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://postgres:5432/abcpay}
+    username: ${SPRING_DATASOURCE_USERNAME:abcpay}
+    password: ${SPRING_DATASOURCE_PASSWORD:abcpay}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        default_schema: payments
+        jdbc.time_zone: UTC
+abcpay:
+  ledger-url: ${ABCPAY_LEDGER_URL:http://ledger-service:8083}
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  metrics:
+    tags:
+      application: ${spring.application.name}
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
