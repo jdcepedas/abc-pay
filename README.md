@@ -67,6 +67,7 @@ docker compose up -d --build
 ./scripts/smoke.sh             # one signed POST through the full stack
 ./scripts/run-experiments.sh   # full A + B suites with reports
 ./scripts/load-demo.sh         # mixed traffic + live Grafana dashboard
+./scripts/reset-metrics.sh     # wipe Prometheus + reset service counters
 ```
 
 Reports are written to `reports/`:

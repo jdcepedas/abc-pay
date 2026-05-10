@@ -41,12 +41,14 @@ Stack is up. Useful URLs:
 
 EOF
 
-if [ ! -d tests/load/node_modules ]; then
-  echo "==> Installing Artillery (one-time)"
-  npm --prefix tests/load install --silent
+cd tests/load
+
+if [ ! -d node_modules ]; then
+  echo "==> Installing Artillery (one-time, may take ~30s)"
+  npm install --no-fund --no-audit
 fi
 
 echo "==> Starting Artillery run (Ctrl-C to stop)"
-ABCPAY_GATEWAY_URL="${ABCPAY_GATEWAY_URL:-http://localhost:8080}" \
-ABCPAY_SHARED_SECRET="${ABCPAY_SHARED_SECRET:-dev-shared-secret-change-me}" \
-  npx --prefix tests/load artillery run tests/load/scenarios.yml
+export ABCPAY_GATEWAY_URL="${ABCPAY_GATEWAY_URL:-http://localhost:8080}"
+export ABCPAY_SHARED_SECRET="${ABCPAY_SHARED_SECRET:-dev-shared-secret-change-me}"
+exec npx artillery run scenarios.yml
