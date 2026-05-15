@@ -1,0 +1,17 @@
+config:
+  target: "{{ $processEnvironment.ABCPAY_LEDGER_URL }}"
+  http:
+    timeout: 30
+  phases:
+    - name: run-once
+      duration: 1
+      arrivalRate: 1
+  processor: "./ledger-processor.js"
+
+scenarios:
+  - name: ledger_immutability_B1_to_B4
+    flow:
+      - function: scenarioB1
+      - function: scenarioB2
+      - function: scenarioB3
+      - function: scenarioB4

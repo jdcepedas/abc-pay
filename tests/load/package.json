@@ -8,6 +8,7 @@
     "quick": "artillery run --overrides='{\"config\":{\"phases\":[{\"duration\":30,\"arrivalRate\":20}]}}' scenarios.yml"
   },
   "devDependencies": {
-    "artillery": "^2.0.21"
+    "@smithy/node-config-provider": "^3.1.9",
+    "artillery": "2.0.21"
   }
 }

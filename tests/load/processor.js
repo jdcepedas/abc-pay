@@ -61,12 +61,16 @@ function buildPayload() {
   });
 }
 
-function applyRequest(requestParams, body, ts, idem, signature) {
+function applyRequest(requestParams, body, ts, idem, signature, scenario) {
   requestParams.headers = requestParams.headers || {};
   requestParams.headers['Content-Type'] = 'application/json';
   requestParams.headers['X-Signature'] = signature;
   requestParams.headers['X-Timestamp'] = String(ts);
   requestParams.headers['X-Idempotency-Key'] = idem;
+  // X-Demo-Scenario is purely a telemetry annotation: the gateway tags its
+  // metrics with it so Grafana can attribute each request to the A1..A5
+  // scenario that produced it. Real clients would not send this header.
+  requestParams.headers['X-Demo-Scenario'] = scenario;
   // Buffer keeps Artillery from re-encoding the body before send.
   requestParams.body = Buffer.isBuffer(body) ? body : Buffer.from(body, 'utf8');
   requestParams.json = undefined;
@@ -78,7 +82,7 @@ function signValid(requestParams, _ctx, _ee, next) {
   const ts = nowSec();
   const idem = uuid();
   const sig = sign(METHOD, PATH, body, ts, idem, SECRET);
-  applyRequest(requestParams, body, ts, idem, sig);
+  applyRequest(requestParams, body, ts, idem, sig, 'A5_valid');
   return next();
 }
 
@@ -92,7 +96,7 @@ function signThenBitFlip(requestParams, _ctx, _ee, next) {
   // Pick a non-structural offset to keep the body parseable.
   const offset = Math.min(8, tampered.length - 1);
   tampered[offset] = tampered[offset] ^ 0x01;
-  applyRequest(requestParams, tampered, ts, idem, sig);
+  applyRequest(requestParams, tampered, ts, idem, sig, 'A1_bit_flip');
   return next();
 }
 
@@ -102,7 +106,7 @@ function signThenChangeTimestamp(requestParams, _ctx, _ee, next) {
   const ts = nowSec();
   const idem = uuid();
   const sig = sign(METHOD, PATH, body, ts, idem, SECRET);
-  applyRequest(requestParams, body, ts + 1, idem, sig);
+  applyRequest(requestParams, body, ts + 1, idem, sig, 'A2_header_tamper');
   return next();
 }
 
@@ -113,7 +117,7 @@ function signOtherBody(requestParams, _ctx, _ee, next) {
   const ts = nowSec();
   const idem = uuid();
   const sig = sign(METHOD, PATH, signedBody, ts, idem, SECRET);
-  applyRequest(requestParams, sentBody, ts, idem, sig);
+  applyRequest(requestParams, sentBody, ts, idem, sig, 'A3_signature_swap');
   return next();
 }
 
@@ -123,7 +127,7 @@ function signWithStaleTimestamp(requestParams, _ctx, _ee, next) {
   const ts = nowSec() - 3600; // 1h in the past, well past the 300s skew window
   const idem = uuid();
   const sig = sign(METHOD, PATH, body, ts, idem, SECRET);
-  applyRequest(requestParams, body, ts, idem, sig);
+  applyRequest(requestParams, body, ts, idem, sig, 'A4_stale_replay');
   return next();
 }
 

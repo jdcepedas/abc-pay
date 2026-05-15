@@ -1,0 +1,17 @@
+config:
+  target: "{{ $processEnvironment.ABCPAY_LEDGER_URL }}"
+  http:
+    timeout: 15
+  phases:
+    - name: append-steady
+      duration: 60
+      arrivalRate: 8
+  processor: "./append-load-processor.js"
+
+scenarios:
+  - name: ledger_append_only
+    weight: 100
+    flow:
+      - post:
+          url: "/api/ledger/append"
+          beforeRequest: "prepareAppend"

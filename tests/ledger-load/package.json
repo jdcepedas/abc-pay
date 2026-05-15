@@ -1,0 +1,15 @@
+{
+  "name": "abc-pay-ledger-load",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Artillery utilities for ledger immutability scenarios (B1-B4) and append load",
+  "scripts": {
+    "scenarios": "artillery run scenarios.yml",
+    "append-load": "artillery run append-load.yml"
+  },
+  "devDependencies": {
+    "@smithy/node-config-provider": "^3.1.9",
+    "artillery": "2.0.21",
+    "pg": "^8.13.1"
+  }
+}

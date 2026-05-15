@@ -24,7 +24,8 @@ cat <<EOF
 
 Stack is up. Useful URLs:
 
-  Grafana       http://localhost:3000/d/asr-seg-02 (anonymous viewer enabled)
+  Grafana (integrity)   http://localhost:3000/d/asr-seg-02 (anonymous viewer enabled)
+  Grafana (ledger)      http://localhost:3000/d/immutable-ledger
   Prometheus    http://localhost:9090
 
   Swagger UIs
@@ -43,12 +44,18 @@ EOF
 
 cd tests/load
 
-if [ ! -d node_modules ]; then
-  echo "==> Installing Artillery (one-time, may take ~30s)"
+ART_VER=""
+if [ -f node_modules/artillery/package.json ]; then
+  ART_VER=$(node -p "require('./node_modules/artillery/package.json').version" 2>/dev/null || echo "")
+fi
+if [ ! -x node_modules/.bin/artillery ] || [ ! -d node_modules/@smithy/node-config-provider ] || [ "$ART_VER" != "2.0.21" ]; then
+  echo "==> Installing Artillery 2.0.21 + smithy (one-time, may take ~30s)"
+  rm -rf node_modules package-lock.json
   npm install --no-fund --no-audit
 fi
 
 echo "==> Starting Artillery run (Ctrl-C to stop)"
+export CI=1
 export ABCPAY_GATEWAY_URL="${ABCPAY_GATEWAY_URL:-http://localhost:8080}"
 export ABCPAY_SHARED_SECRET="${ABCPAY_SHARED_SECRET:-dev-shared-secret-change-me}"
-exec npx artillery run scenarios.yml
+exec ./node_modules/.bin/artillery run scenarios.yml

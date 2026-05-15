@@ -296,6 +296,187 @@
           "legendFormat": "{{eventType}}"
         }
       ]
+    },
+    {
+      "id": 9,
+      "type": "stat",
+      "title": "ASR-SEG-02 verdict (100% = met)",
+      "description": "Detection rate across all tampering scenarios (A1..A4) over the dashboard time range. Reaches 100% when every tampered request was rejected.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 30 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 80 },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99.999 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {
+        "graphMode": "none",
+        "colorMode": "background",
+        "textMode": "value",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "100 * sum(increase(abcpay_gateway_requests_total{scenario=~\"A[1-4]_.*\", outcome=~\"rejected_.*\"}[$__range])) / clamp_min(sum(increase(abcpay_gateway_requests_total{scenario=~\"A[1-4]_.*\"}[$__range])), 1)"
+        }
+      ]
+    },
+    {
+      "id": 10,
+      "type": "bargauge",
+      "title": "Detection rate per attack scenario",
+      "description": "Each bar reaches 100% when the validator caught every tampered request from that scenario. A green full bar across A1..A4 demonstrates ASR-SEG-02 is met.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 8, "w": 16, "x": 8, "y": 30 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "decimals": 2,
+          "color": { "mode": "thresholds" },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "orange", "value": 80 },
+              { "color": "yellow", "value": 95 },
+              { "color": "green", "value": 99.999 }
+            ]
+          },
+          "noValue": "0"
+        }
+      },
+      "options": {
+        "displayMode": "gradient",
+        "orientation": "horizontal",
+        "showUnfilled": true,
+        "minVizWidth": 0,
+        "minVizHeight": 16,
+        "valueMode": "color",
+        "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "100 * sum by (scenario) (increase(abcpay_gateway_requests_total{scenario=~\"A[1-4]_.*\", outcome=~\"rejected_.*\"}[$__range])) / clamp_min(sum by (scenario) (increase(abcpay_gateway_requests_total{scenario=~\"A[1-4]_.*\"}[$__range])), 1)",
+          "legendFormat": "{{scenario}}"
+        }
+      ]
+    },
+    {
+      "id": 11,
+      "type": "barchart",
+      "title": "Expected vs detected attacks (cumulative)",
+      "description": "Two bars per scenario: how many tampered requests were sent and how many were rejected by the validator. Identical heights means 100% detection.",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 10, "w": 12, "x": 0, "y": 38 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "lineWidth": 1,
+            "fillOpacity": 80,
+            "axisPlacement": "auto",
+            "axisLabel": "requests"
+          }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byRegexp", "options": "Expected.*" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "blue" } }]
+          },
+          {
+            "matcher": { "id": "byRegexp", "options": "Detected.*" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          }
+        ]
+      },
+      "options": {
+        "orientation": "auto",
+        "stacking": "none",
+        "groupWidth": 0.7,
+        "barWidth": 0.95,
+        "barRadius": 0,
+        "showValue": "always",
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0,
+        "tooltip": { "mode": "multi", "sort": "none" },
+        "legend": { "displayMode": "list", "placement": "bottom", "showLegend": true }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (scenario) (increase(abcpay_gateway_requests_total{scenario=~\"A[1-4]_.*\"}[$__range]))",
+          "legendFormat": "Expected ({{scenario}})",
+          "instant": true
+        },
+        {
+          "refId": "B",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (scenario) (increase(abcpay_gateway_requests_total{scenario=~\"A[1-4]_.*\", outcome=~\"rejected_.*\"}[$__range]))",
+          "legendFormat": "Detected ({{scenario}})",
+          "instant": true
+        }
+      ]
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "Traffic mix per scenario (req/s)",
+      "description": "Live request rate per scenario, including the A5_valid control group. Validates that the load generator is sending the expected mix (~80% valid, ~5% per attack).",
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "gridPos": { "h": 10, "w": 12, "x": 12, "y": 38 },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 25,
+            "stacking": { "mode": "normal", "group": "A" },
+            "lineInterpolation": "smooth",
+            "showPoints": "never"
+          },
+          "color": { "mode": "palette-classic" }
+        },
+        "overrides": [
+          {
+            "matcher": { "id": "byName", "options": "A5_valid" },
+            "properties": [{ "id": "color", "value": { "mode": "fixed", "fixedColor": "green" } }]
+          }
+        ]
+      },
+      "options": {
+        "legend": { "displayMode": "table", "placement": "right", "showLegend": true, "calcs": ["mean", "max", "lastNotNull"] },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (scenario) (rate(abcpay_gateway_requests_total{scenario!=\"production\"}[1m]))",
+          "legendFormat": "{{scenario}}"
+        }
+      ]
     }
   ]
 }

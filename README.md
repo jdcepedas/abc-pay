@@ -48,8 +48,10 @@ abc-pay/
 │   ├── payments-service/
 │   └── ledger-service/
 ├── tests/experiments/           # A1-A5 / B1-B4 harness (CLI app)
+├── tests/load/                  # Artillery: gateway integrity load (A*)
+├── tests/ledger-load/           # Artillery: ledger B1-B4 + append-only load
 ├── infra/postgres/init/         # SQL schema
-└── scripts/                     # smoke.sh, run-experiments.sh
+└── scripts/                     # smoke.sh, run-experiments.sh, load-demo.sh, …
 ```
 
 ## Prerequisites
@@ -68,6 +70,8 @@ docker compose up -d --build
 ./scripts/run-experiments.sh   # full A + B suites with reports
 ./scripts/load-demo.sh         # mixed traffic + live Grafana dashboard
 ./scripts/reset-metrics.sh     # wipe Prometheus + reset service counters
+./scripts/ledger-load-demo.sh  # Artillery + SQL: ledger B1-B4 immutability checks
+./scripts/ledger-append-load.sh # Artillery: sustained POST /api/ledger/append only
 ```
 
 Reports are written to `reports/`:
@@ -83,7 +87,7 @@ pre-loaded with the dashboard `ASR-SEG-02 - Live Telemetry`.
 
 ```bash
 ./scripts/load-demo.sh
-# then open http://localhost:3000/d/asr-seg-02
+# then open http://localhost:3000/d/asr-seg-02 (integrity) or http://localhost:3000/d/immutable-ledger (ledger)
 ```
 
 The Artillery scenario in [tests/load/scenarios.yml](tests/load/scenarios.yml)
@@ -94,7 +98,8 @@ tamper, `A3` signature swap, `A4` stale replay). The validator's
 
 | URL | Purpose |
 |-----|---------|
-| http://localhost:3000/d/asr-seg-02 | Grafana dashboard (anonymous viewer) |
+| http://localhost:3000/d/asr-seg-02 | Grafana: gateway + validator + payments (integrity demo) |
+| http://localhost:3000/d/immutable-ledger | Grafana: ledger append / verify + JVM (audit trail) |
 | http://localhost:9090 | Prometheus UI |
 | http://localhost:8081/actuator/prometheus | Validator raw metrics |
 
@@ -155,6 +160,51 @@ or `record_hash` and is reported as a failure.
 The service exposes only `POST /api/ledger/append` and `GET /api/ledger/verify`.
 There is no UPDATE/DELETE endpoint by design.
 
+## Ledger utilities (Artillery, B1-B4)
+
+A second Artillery project under [tests/ledger-load/](tests/ledger-load/) mirrors
+the Java harness for **Table B**: it seeds the ledger over HTTP, applies the
+same attacker SQL mutations as `LedgerTamperer`, and asserts that
+`GET /api/ledger/verify` flips from `valid: true` to `valid: false` each time.
+
+Prerequisites: `docker compose up` with Postgres published on **5432** and the
+ledger service on **8083** (defaults in Compose). The script needs **direct
+database access** from your machine (same as the Java experiments).
+
+```bash
+./scripts/ledger-load-demo.sh
+```
+
+Summary JSON is written to `reports/ledger-artillery.json`. For live charts of
+append and verify traffic, open the **Immutable ledger** Grafana dashboard:
+http://localhost:3000/d/immutable-ledger
+
+Optional sustained append-only load (no tampering), to stress
+`POST /api/ledger/append` and Grafana ledger panels:
+
+```bash
+./scripts/ledger-append-load.sh
+```
+
+| File | Purpose |
+|------|---------|
+| [tests/ledger-load/scenarios.yml](tests/ledger-load/scenarios.yml) | One-shot B1→B4 flow (function hooks) |
+| [tests/ledger-load/append-load.yml](tests/ledger-load/append-load.yml) | HTTP append load profile |
+| [tests/ledger-load/ledger-processor.js](tests/ledger-load/ledger-processor.js) | Truncate, seed, tamper SQL, verify |
+
+Environment variables: `ABCPAY_LEDGER_URL`, `ABCPAY_DB_URL`, `ABCPAY_LEDGER_SEED_SIZE`
+(see [.env.example](.env.example)).
+
+If `artillery run` fails with `Cannot find module '@smithy/node-config-provider'`, delete
+`tests/ledger-load/node_modules` and `package-lock.json`, then run the script again (the
+repo pins that package as a direct dependency so npm installs it reliably).
+
+**About `artillery dino`:** `dino` is a small easter-egg command, not the load-test runner.
+If the real `run` command fails to register (broken Artillery install), Oclif may ask
+`Did you mean dino?` — answer **no**, or run our scripts (they set `CI=1` to avoid that
+prompt). This repo pins **Artillery 2.0.21** because some **2.0.31** installs omit a
+working `run` command.
+
 ## Scenarios
 
 ### Table A - Verify Message Integrity
@@ -186,6 +236,8 @@ Success criterion: zero false negatives across all in-scope tampering cases.
 | `ABCPAY_LEDGER_ITERATIONS` | 10 | Iterations per B scenario |
 | `ABCPAY_LEDGER_SEED_SIZE` | 20 | Events appended before each B mutation |
 | `ABCPAY_SHARED_SECRET` | `dev-shared-secret-change-me` | HMAC secret |
+| `ABCPAY_LEDGER_URL` | `http://127.0.0.1:8083` | Ledger HTTP base URL (ledger-load Artillery) |
+| `ABCPAY_DB_URL` | `postgresql://abcpay:abcpay@127.0.0.1:5432/abcpay` | Postgres JDBC URL for ledger tamper SQL |
 
 ## Secret isolation
 

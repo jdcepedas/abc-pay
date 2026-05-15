@@ -68,10 +68,14 @@ public class GatewayController {
             @RequestHeader(name = "X-Timestamp", required = false) String timestamp,
             @Parameter(description = "Unique idempotency key for safe retries", required = true)
             @RequestHeader(name = "X-Idempotency-Key", required = false) String idemKey,
+            @Parameter(description = "Optional demo annotation. Set by Artillery's processor.js to attribute traffic to A1..A5 in the dashboard.", hidden = true)
+            @RequestHeader(name = "X-Demo-Scenario", required = false) String demoScenario,
             HttpServletRequest req) {
 
+        String scenario = demoScenario == null || demoScenario.isBlank() ? "production" : demoScenario;
+
         if (signature == null || timestamp == null || idemKey == null) {
-            recordOutcome("rejected_missing_headers");
+            recordOutcome(scenario, "rejected_missing_headers", "missing_headers");
             return ResponseEntity.status(401)
                     .body(Map.of("error", "missing_signing_headers"));
         }
@@ -93,16 +97,17 @@ public class GatewayController {
                     .retrieve()
                     .body(Map.class);
         } catch (Exception e) {
-            recordOutcome("validator_unavailable");
+            recordOutcome(scenario, "validator_unavailable", "validator_unavailable");
             return ResponseEntity.status(503)
                     .body(Map.of("error", "validator_unavailable", "detail", e.getMessage()));
         }
 
         if (verdict == null || !Boolean.TRUE.equals(verdict.get("valid"))) {
-            recordOutcome("rejected_integrity");
+            String reason = verdict == null ? "no_response" : String.valueOf(verdict.get("reason"));
+            recordOutcome(scenario, "rejected_integrity", reason);
             return ResponseEntity.status(401).body(Map.of(
                     "error", "integrity_check_failed",
-                    "reason", verdict == null ? "no_response" : verdict.get("reason")));
+                    "reason", reason));
         }
 
         try {
@@ -118,16 +123,19 @@ public class GatewayController {
                     .body(body)
                     .retrieve()
                     .body(Object.class);
-            recordOutcome("accepted");
+            recordOutcome(scenario, "accepted", "ok");
             return ResponseEntity.ok(result);
         } catch (Exception e) {
-            recordOutcome("upstream_error");
+            recordOutcome(scenario, "upstream_error", "upstream_error");
             return ResponseEntity.status(502)
                     .body(Map.of("error", "payments_unavailable", "detail", e.getMessage()));
         }
     }
 
-    private void recordOutcome(String outcome) {
-        meterRegistry.counter(METRIC_REQUESTS, "outcome", outcome).increment();
+    private void recordOutcome(String scenario, String outcome, String reason) {
+        meterRegistry.counter(METRIC_REQUESTS,
+                "outcome", outcome,
+                "scenario", scenario,
+                "reason", reason).increment();
     }
 }
